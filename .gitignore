@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+*.pyo
+*.pyd
+*.pdb
+*.db
+*.sqlite3
+*.sqlite3-journal
+
+# Virtual environment
+env
+.venv
+venv/
+ENV/
+env.bak/
+env/
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Django stuff:
+*.log
+staticfiles/
+media/
+local_settings.py
+
+# Migrations (optional, keep if you want versioned migrations)
+*/migrations/*
+!*/migrations/__init__.py
+
+# Byte-compiled / cache
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage & test
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+
+# System files
+.DS_Store
+Thumbs.db
+celerybeat-schedule

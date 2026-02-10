@@ -1,0 +1,58 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    container_name: ed_web
+    command: gunicorn core.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers 4
+    volumes:
+      - .:/app
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings
+      - REDIS_HOST=redis
+
+  redis:
+    image: redis:7
+    container_name: ed_redis
+    ports:
+      - "6380:6379"
+
+  # celery_worker:
+  #   build: .
+  #   container_name: celery_worker
+  #   command: celery -A core worker -l info --pool=solo
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+  #   depends_on:
+  #     - redis
+  #     - web
+  #   restart: always
+
+  # celery_beat:
+  #   build: .
+  #   container_name: celery_beat
+  #   command: celery -A core beat -l info
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+  #   depends_on:
+  #     - redis
+  #     - web
+  #   restart: always
+
+  nginx:
+    image: nginx:latest
+    container_name: ed_nginx
+    ports:
+      - "8001:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./staticfiles:/static
+      - ./media:/media
+    depends_on:
+      - web
