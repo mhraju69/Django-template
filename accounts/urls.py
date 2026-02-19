@@ -10,4 +10,6 @@ urlpatterns = [
     path('get-otp/', GetOtpView.as_view(), name='get_otp'),
     path('reset-password/', ResetPassword.as_view(), name='reset_password'),
     path('profile/', GetProfileView.as_view(), name='get_profile'),
+    path('google/login/', GoogleLoginView.as_view(), name='google_login'),
+    path('apple/login/', AppleLoginView.as_view(), name='apple_login'),
 ]

@@ -44,6 +44,7 @@ class SignInView(generics.CreateAPIView):
             "access": str(refresh.access_token),
         }, status=status.HTTP_200_OK)
 
+
 class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -136,5 +137,69 @@ class GetProfileView(generics.RetrieveUpdateDestroyAPIView):
     
     def get_object(self):
         return self.request.user
+
+
+class GoogleLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+
+        token = request.query_params.get('token')
+
+        if not token:
+            return Response({'success': False,'log': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user, error = google_login(token)
+
+        if user:
+            token = RefreshToken.for_user(user)
+            return Response({
+                'access': str(token.access_token),
+                'refresh': str(token),
+                'user': UserProfileSerializer(user, context={'request': request}).data,
+                'status': True,
+                'log': 'Login successful'
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': False,'log': error}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class AppleLoginView(APIView):
+
+    permission_classes = [permissions.AllowAny]
+    def post(self, request):
+        identity_token = request.data.get('identity_token') or request.data.get('id_token')
+        user_info_raw = request.data.get('user', {}) 
+        
+        user , error = apple_login(identity_token, user_info_raw)        
+
+        if user:
+            refresh = RefreshToken.for_user(user)
+            access = str(refresh.access_token)
+            refresh_token = str(refresh)
+        else:
+            return Response({'status': False,'log': error}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if it's a browser/redirect flow (Form Data from Apple)
+        if request.content_type == 'application/x-www-form-urlencoded':
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'https://wahejan.vercel.app').rstrip('/')
+            callback_url = f"{frontend_url}/auth/callback"
+            
+            params = urllib.parse.urlencode({
+                'access': access,
+                'refresh': refresh_token,
+                'status': True,
+                'log': 'Login successful'
+            })
+            return redirect(f"{callback_url}?{params}")
+
+        return Response({
+            "access": access, 
+            "refresh": refresh_token, 
+            "user": UserProfileSerializer(user, context={'request': request}).data,
+            "status": True,
+            "log": "Login successful"
+        })
 
 
