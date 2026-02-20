@@ -7,15 +7,19 @@ from channels.auth import AuthMiddlewareStack
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 django.setup()
 
-import messaging.routing
+application = get_asgi_application()
 
-websocket_urlpatterns = messaging.routing.websocket_urlpatterns 
 
-application = ProtocolTypeRouter({
-    "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            websocket_urlpatterns
-        )
-    ),
-})
+# import messaging.routing
+
+# websocket_urlpatterns = messaging.routing.websocket_urlpatterns 
+
+# application = ProtocolTypeRouter({
+#     "http": get_asgi_application(),
+#     "websocket": AuthMiddlewareStack(
+#         URLRouter(
+#             websocket_urlpatterns
+#         )
+#     ),
+# })
+
