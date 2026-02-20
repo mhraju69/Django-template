@@ -9,26 +9,7 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    build-essential \
-    autoconf \
-    automake \
-    libtool \
-    ffmpeg \
-    wget \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-# Build RNNoise
-WORKDIR /opt
-RUN git clone https://github.com/xiph/rnnoise.git
-WORKDIR /opt/rnnoise
-RUN ./autogen.sh && ./configure && make 
-
-# Manually install the demo binary as it is not installed by make install usually
-RUN cp examples/.libs/rnnoise_demo /usr/local/bin/rnnoise_demo
-RUN make install && ldconfig
+RUN apt-get update && apt-get install -y
 
 # Install dependencies
 WORKDIR /app
