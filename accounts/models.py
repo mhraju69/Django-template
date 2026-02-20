@@ -20,6 +20,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('role', 'admin')
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
@@ -29,14 +30,13 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    ROLE = (('parent', 'Parent'),('child', 'Child'),('admin', 'Admin'),)
+    ROLE = (('user', 'User'),('admin', 'Admin'),)
     email = models.EmailField(max_length=255,unique=True,verbose_name="User Email")
     name = models.CharField(max_length=200, blank=True, null=True,verbose_name="User Name")
     bio = models.TextField(blank=True, null=True,verbose_name="User Bio")
     cover = models.ImageField(upload_to='cover_images/', blank=True, null=True,)
     image = models.ImageField(upload_to='profile_images/', blank=True, null=True,)
-    role = models.CharField(max_length=10, choices=ROLE, default='parent',verbose_name="User Role")
-    parent = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='children',)
+    role = models.CharField(max_length=10, choices=ROLE, default='user',verbose_name="User Role")
     is_active = models.BooleanField(default=False,verbose_name="Active User")
     is_staff = models.BooleanField(default=False,verbose_name="Staff User")
     is_superuser = models.BooleanField(default=False,verbose_name="Super User")  
@@ -62,21 +62,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.is_staff and self.is_superuser:
             self.role = 'admin'
 
-        if self.role == 'parent':
-            self.parent = None
-
-        if self.role == 'child' and self.parent is None:
-            raise ValueError("Child users must have a parent assigned")
-
         super().save(*args, **kwargs)
 
     @property
-    def is_parent(self):
-        return self.role == 'parent'
+    def is_user(self):
+        return self.role == 'user'
 
     @property
-    def is_child(self):
-        return self.role == 'child'
+    def is_admin(self):
+        return self.role == 'admin'
 
 
 class OTP(models.Model):
