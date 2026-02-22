@@ -26,10 +26,9 @@ class SignUpSerializer(serializers.ModelSerializer):
         return user
 
 
-class SignInSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['email', 'password']
+class SignInSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(style={'input_type': 'password'})
     
     def validate(self, attrs):
         email = attrs.get('email')
