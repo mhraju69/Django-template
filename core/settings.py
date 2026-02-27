@@ -6,14 +6,16 @@ from dotenv import load_dotenv
 load_dotenv()
 from corsheaders.defaults import default_headers
 
-DEBUG = True
-ALLOWED_HOSTS = ['*']
-CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+DEBUG = os.getenv('DEBUG', True)
 SECRET_KEY = os.getenv("SECRET_KEY")
 BASE_DIR = Path(__file__).resolve().parent.parent
-CORS_ALLOW_HEADERS = list(default_headers) + ['ngrok-skip-browser-warning',]
+STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760 * 400 # 400MB
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
+CORS_ALLOW_HEADERS = list(default_headers) + ['ngrok-skip-browser-warning',]
 CORS_ALLOW_ORIGINS =  os.getenv('CORS_ALLOW_ORIGINS', 'localhost:8000,localhost:3000').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'localhost:8000,localhost:3000').split(',')
 

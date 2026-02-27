@@ -166,21 +166,67 @@ class GoogleLoginView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AppleLoginView(APIView):
-
     permission_classes = [permissions.AllowAny]
     def post(self, request):
+        # Handle both JSON (mobile) and Form Data (Apple Redirect)
         identity_token = request.data.get('identity_token') or request.data.get('id_token')
+        # Apple sometimes sends user info (name) for the first time
         user_info_raw = request.data.get('user', {}) 
         
-        user , error = apple_login(identity_token, user_info_raw)        
+        import json
+        user_info = {}
+        if user_info_raw:
+            try:
+                user_info = json.loads(user_info_raw) if isinstance(user_info_raw, str) else user_info_raw
+            except:
+                pass
 
-        if user:
-            refresh = RefreshToken.for_user(user)
-            access = str(refresh.access_token)
-            refresh_token = str(refresh)
-        else:
-            return Response({'status': False,'log': error}, status=status.HTTP_400_BAD_REQUEST)
+        if not identity_token:
+            return Response({'error': 'No identity token provided'}, status=400)
+            
+        decoded_token = verify_apple_id_token(identity_token)
+        if not decoded_token:
+            return Response({'error': 'Invalid identity token'}, status=400)
+            
+        email = decoded_token.get('email')
+        apple_sub = decoded_token.get('sub')  # Apple unique user ID (always present)
 
+        # ✅ "Hide My Email" users এর জন্য sub দিয়ে fallback
+        # Apple Private Relay email বা sub-based synthetic email ব্যবহার করো
+        if not email:
+            if not apple_sub:
+                return Response({'error': 'Unable to identify Apple user'}, status=400)
+            # sub দিয়ে existing user খোঁজো অথবা synthetic email বানাও
+            email = f"apple_{apple_sub}@privaterelay.appleid.com"
+            
+        # Try to get name from user_info if provided (first time login)
+        name = user_info.get('name', {}).get('firstName', '')
+        last_name = user_info.get('name', {}).get('lastName', '')
+        full_name = f"{name} {last_name}".strip() if name or last_name else email.split('@')[0]
+
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'name': full_name,
+                'is_active': True,
+                'password': make_password(None)
+            }
+        )
+
+        if getattr(user, 'block', False):
+            return Response(
+                {"error": "User account is disabled. Please contact support"},
+                status=403
+            )
+
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+        refresh_token = str(refresh)
+        
+        plan = Subscriptions.objects.filter(company=get_company(user)).first()
+        session = generate_session(request, user, refresh.access_token)   
+        
         # Check if it's a browser/redirect flow (Form Data from Apple)
         if request.content_type == 'application/x-www-form-urlencoded':
             frontend_url = getattr(settings, 'FRONTEND_URL', 'https://wahejan.vercel.app').rstrip('/')
@@ -189,17 +235,17 @@ class AppleLoginView(APIView):
             params = urllib.parse.urlencode({
                 'access': access,
                 'refresh': refresh_token,
-                'status': True,
-                'log': 'Login successful'
+                'plan': True if plan else False,
+                'status': 'success',
             })
             return redirect(f"{callback_url}?{params}")
 
+        # Standard JSON response for mobile/direct API
+        serializer = UserSerializer(user, context={'request': request})
         return Response({
+            "user": serializer.data, 
             "access": access, 
-            "refresh": refresh_token, 
-            "user": UserProfileSerializer(user, context={'request': request}).data,
-            "status": True,
-            "log": "Login successful"
+            "refresh": refresh_token,
+            "plan": True if plan else False,
         })
-
 
