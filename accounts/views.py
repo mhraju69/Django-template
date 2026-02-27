@@ -22,7 +22,7 @@ class SignUpView(generics.CreateAPIView):
         refresh = RefreshToken.for_user(user)
         return Response({
             "status": True,
-            "user": UserProfileSerializer(user).data,
+            "log": UserProfileSerializer(user).data,
             "refresh": str(refresh),
             "access": str(refresh.access_token),
         }, status=status.HTTP_201_CREATED)
@@ -39,7 +39,7 @@ class SignInView(generics.CreateAPIView):
         refresh = RefreshToken.for_user(user)
         return Response({
             "status": True,
-            "user": UserProfileSerializer(user).data,
+            "log": UserProfileSerializer(user).data,
             "refresh": str(refresh),
             "access": str(refresh.access_token),
         }, status=status.HTTP_200_OK)
@@ -94,7 +94,7 @@ class OtpVerifyView(APIView):
             # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
             return Response({
-                "user": UserProfileSerializer(user).data,
+                "log": UserProfileSerializer(user).data,
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
             }, status=status.HTTP_200_OK)
@@ -156,9 +156,8 @@ class GoogleLoginView(APIView):
             return Response({
                 'access': str(token.access_token),
                 'refresh': str(token),
-                'user': UserProfileSerializer(user, context={'request': request}).data,
+                'log': UserProfileSerializer(user, context={'request': request}).data,
                 'status': True,
-                'log': 'Login successful'
             }, status=status.HTTP_200_OK)
         else:
             return Response({'status': False,'log': error}, status=status.HTTP_400_BAD_REQUEST)
@@ -229,7 +228,7 @@ class AppleLoginView(APIView):
         
         # Check if it's a browser/redirect flow (Form Data from Apple)
         if request.content_type == 'application/x-www-form-urlencoded':
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'https://wahejan.vercel.app').rstrip('/')
+            frontend_url = getattr(settings, 'FRONTEND_URL').rstrip('/')
             callback_url = f"{frontend_url}/auth/callback"
             
             params = urllib.parse.urlencode({
@@ -243,7 +242,7 @@ class AppleLoginView(APIView):
         # Standard JSON response for mobile/direct API
         serializer = UserSerializer(user, context={'request': request})
         return Response({
-            "user": serializer.data, 
+            "log": serializer.data, 
             "access": access, 
             "refresh": refresh_token,
             "plan": True if plan else False,
