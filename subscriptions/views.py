@@ -10,6 +10,6 @@ class GetPlans(APIView):
     serializer_class = PlanSerializers
 
     def get(self, request):
-        plans = Plan.objects.filter(custom=False)  
+        plans = Plan.objects.all()
         serializer = self.serializer_class(plans, many=True)  
         return Response({"status":True , "log": serializer.data})
