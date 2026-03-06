@@ -5,6 +5,11 @@ from datetime import timedelta
 from dotenv import load_dotenv
 load_dotenv()
 from corsheaders.defaults import default_headers
+import firebase_admin
+from firebase_admin import credentials
+
+cred = credentials.Certificate("firebase-key.json")
+firebase_admin.initialize_app(cred)
 
 CORS_ALLOW_CREDENTIALS = True
 DEBUG = os.getenv('DEBUG', True)

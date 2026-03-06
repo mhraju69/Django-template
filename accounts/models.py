@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
 from django.conf import settings
-import random
+import random,uuid
 from django.utils import timezone
 from datetime import timedelta
 
@@ -31,6 +31,9 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE = (('user', 'User'),('admin', 'Admin'),)
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    uid = models.CharField(max_length=255,unique=True,verbose_name="User UID",null=True,blank=True)
     email = models.EmailField(max_length=255,unique=True,verbose_name="User Email")
     name = models.CharField(max_length=200, blank=True, null=True,verbose_name="User Name")
     bio = models.TextField(blank=True, null=True,verbose_name="User Bio")
@@ -39,7 +42,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=10, choices=ROLE, default='user',verbose_name="User Role")
     is_active = models.BooleanField(default=False,verbose_name="Active User")
     is_staff = models.BooleanField(default=False,verbose_name="Staff User")
-    is_superuser = models.BooleanField(default=False,verbose_name="Super User")  
+    is_superuser = models.BooleanField(default=False,verbose_name="Super User")
     date_joined = models.DateTimeField(auto_now_add=True, verbose_name="Joining Date")
     block = models.BooleanField(default=False,verbose_name="Suspend User")
 

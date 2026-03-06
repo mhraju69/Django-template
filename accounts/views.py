@@ -139,112 +139,74 @@ class GetProfileView(generics.RetrieveUpdateDestroyAPIView):
         return self.request.user
 
 
-class GoogleLoginView(APIView):
+class FirebaseLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        id_token = request.query_params.get('token')
+        oauth = request.query_params.get('oauth',True)
 
-        token = request.query_params.get('token')
-
-        if not token:
-            return Response({'success': False,'log': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not id_token:
+            return Response({'status': False,'log': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        user, error = google_login(token)
+        try:
+            decoded_token = firebase_auth.verify_id_token(id_token)
+        except Exception as e:
+            return Response({'status': False,'log': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        uid = decoded_token.get('uid')
+        email = decoded_token.get('email')
+        
+        if not email:
+            return Response({'status': False,'log': 'Email not provided by Firebase'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        name = decoded_token.get('name')
+        profile_image_url = decoded_token.get('picture')
+
+        if oauth:
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    "uid":uid,
+                    'name': name,
+                    'is_active': True,
+                    'password': make_password(None),
+                },
+            )
+            if created and profile_image_url:
+                img_response = requests.get(profile_image_url)
+                if img_response.status_code == 200:
+                    file_name = f"{slugify(name or email.split('@')[0])}-profile.jpg"
+                    user.image.save(
+                        file_name,
+                        ContentFile(img_response.content),
+                        save=True,
+                    )
+        else:
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    "uid":uid,
+                    'name': request.data.get('name') or "",
+                    'is_active': False,
+                    'password': make_password(uid),
+                }
+            )
+            if not user.is_active:
+                send_otp(user.email)
+
+            print(UserProfileSerializer(user, context={'request': request}).data)
 
         if user:
             token = RefreshToken.for_user(user)
             return Response({
                 'access': str(token.access_token),
                 'refresh': str(token),
-                'log': UserProfileSerializer(user, context={'request': request}).data,
+                'user': UserProfileSerializer(user, context={'request': request}).data,
                 'status': True,
+                'active': user.is_active,
+                'log': 'Login successful'
             }, status=status.HTTP_200_OK)
         else:
-            return Response({'status': False,'log': error}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class AppleLoginView(APIView):
-    permission_classes = [permissions.AllowAny]
-    def post(self, request):
-        # Handle both JSON (mobile) and Form Data (Apple Redirect)
-        identity_token = request.data.get('identity_token') or request.data.get('id_token')
-        # Apple sometimes sends user info (name) for the first time
-        user_info_raw = request.data.get('user', {}) 
-        
-        import json
-        user_info = {}
-        if user_info_raw:
-            try:
-                user_info = json.loads(user_info_raw) if isinstance(user_info_raw, str) else user_info_raw
-            except:
-                pass
-
-        if not identity_token:
-            return Response({'error': 'No identity token provided'}, status=400)
-            
-        decoded_token = verify_apple_id_token(identity_token)
-        if not decoded_token:
-            return Response({'error': 'Invalid identity token'}, status=400)
-            
-        email = decoded_token.get('email')
-        apple_sub = decoded_token.get('sub')  # Apple unique user ID (always present)
-
-        # ✅ "Hide My Email" users এর জন্য sub দিয়ে fallback
-        # Apple Private Relay email বা sub-based synthetic email ব্যবহার করো
-        if not email:
-            if not apple_sub:
-                return Response({'error': 'Unable to identify Apple user'}, status=400)
-            # sub দিয়ে existing user খোঁজো অথবা synthetic email বানাও
-            email = f"apple_{apple_sub}@privaterelay.appleid.com"
-            
-        # Try to get name from user_info if provided (first time login)
-        name = user_info.get('name', {}).get('firstName', '')
-        last_name = user_info.get('name', {}).get('lastName', '')
-        full_name = f"{name} {last_name}".strip() if name or last_name else email.split('@')[0]
-
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                'name': full_name,
-                'is_active': True,
-                'password': make_password(None)
-            }
-        )
-
-        if getattr(user, 'block', False):
-            return Response(
-                {"error": "User account is disabled. Please contact support"},
-                status=403
-            )
-
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-        access = str(refresh.access_token)
-        refresh_token = str(refresh)
-        
-        plan = Subscriptions.objects.filter(company=get_company(user)).first()
-        session = generate_session(request, user, refresh.access_token)   
-        
-        # Check if it's a browser/redirect flow (Form Data from Apple)
-        if request.content_type == 'application/x-www-form-urlencoded':
-            frontend_url = getattr(settings, 'FRONTEND_URL').rstrip('/')
-            callback_url = f"{frontend_url}/auth/callback"
-            
-            params = urllib.parse.urlencode({
-                'access': access,
-                'refresh': refresh_token,
-                'plan': True if plan else False,
-                'status': 'success',
-            })
-            return redirect(f"{callback_url}?{params}")
-
-        # Standard JSON response for mobile/direct API
-        serializer = UserSerializer(user, context={'request': request})
-        return Response({
-            "log": serializer.data, 
-            "access": access, 
-            "refresh": refresh_token,
-            "plan": True if plan else False,
-        })
+            return Response({'status': False,'log': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
 
